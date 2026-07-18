@@ -1,0 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom styles for tactile experience, updated to high-density flat/subtle feel */
+.tactile-btn {
+  position: relative;
+  transition: all 0.08s ease;
+  box-shadow: 0 1px 0 0 rgba(27, 31, 36, 0.04);
+}
+
+.tactile-btn:active {
+  transform: translateY(1px);
+}
+
+.tactile-btn-secondary {
+  position: relative;
+  transition: all 0.08s ease;
+  box-shadow: 0 1px 0 0 rgba(27, 31, 36, 0.04);
+}
+
+.tactile-btn-secondary:active {
+  transform: translateY(1px);
+}
+

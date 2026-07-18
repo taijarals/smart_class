@@ -1,0 +1,6 @@
+{
+  "name": "Smart Class",
+  "description": "Plataforma acadêmica gamificada com check-in inteligente de 5 minutos, banco de questões e recompensas virtuais (ClassCoins).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
