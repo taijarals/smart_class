@@ -220,22 +220,26 @@ export async function upsertStudent(student: Student): Promise<boolean> {
     return true;
   } catch (err: any) {
     console.error("Supabase upsert exception details:", err.message, err);
-    return false;
+    throw err;
   }
 }
 
 export async function deleteStudent(id: string): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
+  if (!isSupabaseConfigured) return false;
   try {
-    const { error } = await supabase
-      .from("sc_usuarios")
-      .delete()
-      .eq("id", id);
+    const response = await fetch("/api/auth/delete-student", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
 
-    if (error) {
-      console.error("Error deleting student from Supabase:", error);
-      return false;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Falha ao deletar cadastro");
     }
+
     return true;
   } catch (err) {
     console.error("Supabase delete exception:", err);

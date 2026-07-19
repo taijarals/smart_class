@@ -48,7 +48,6 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
   
   // Registration fields
   const [regName, setRegName] = useState("");
-  const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regMatricula, setRegMatricula] = useState("");
@@ -189,7 +188,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
     const password = loginPassword.trim();
 
     if (!username || !password) {
-      setErrorMessage("Por favor, preencha o usuário e a senha.");
+      setErrorMessage("Por favor, preencha o e-mail/usuário e a senha.");
       setIsSubmitting(false);
       return;
     }
@@ -228,12 +227,20 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ identifier: emailToAuth, password })
             });
+            const backendResponse = await res.json();
             if (res.ok) {
-              const backendUser = await res.json();
-              if (backendUser && backendUser.id) {
+              if (backendResponse && backendResponse.id) {
                 authErrorObj = null;
-                authUserId = backendUser.id;
+                authUserId = backendResponse.id;
               }
+            } else if (res.status === 403) {
+              setErrorMessage("Cadastro pendente de aprovação. O administrador precisa aprovar sua conta.");
+              setIsSubmitting(false);
+              return;
+            } else if (res.status === 401) {
+              setErrorMessage("Credenciais inválidas. Verifique seu e-mail e senha.");
+              setIsSubmitting(false);
+              return;
             }
           } catch (e) {
             console.error("Fallback login error:", e);
@@ -241,7 +248,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
         }
 
         if (authErrorObj) {
-          setErrorMessage(`Credenciais inválidas: ${authErrorObj?.message || 'Verifique seu e-mail e senha'}`);
+          setErrorMessage(`Erro ao fazer login: Verifique seu e-mail e senha.`);
           setIsSubmitting(false);
           return;
         }
@@ -349,7 +356,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
         }
 
         // Verify Password match for database-based fallback
-        if (foundUser.senha !== password) {
+        if (!authenticatedViaSupabaseAuth && foundUser.senha !== password) {
           setErrorMessage("Senha incorreta.");
           setIsSubmitting(false);
           return;
@@ -365,6 +372,9 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
 
       // Verify Access Approval (RN5.1)
       if (!foundUser.approved) {
+        if (isSupabaseConfigured && supabase) {
+          await supabase.auth.signOut();
+        }
         setErrorMessage(`Acesso Pendente: O cadastro de "${foundUser.nome}" ainda não foi aprovado por um Administrador no ambiente de Gestão de Acessos.`);
         setIsSubmitting(false);
         return;
@@ -388,12 +398,12 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
     setIsSubmitting(true);
 
     const name = regName.trim();
-    const username = regUsername.trim().toLowerCase();
-    const password = regPassword.trim();
     const email = regEmail.trim();
+    const username = email.toLowerCase();
+    const password = regPassword.trim();
     const matricula = regMatricula.trim();
 
-    if (!name || !username || !password || !email || !matricula) {
+    if (!name || !email || !password || !matricula) {
       setErrorMessage("Por favor, preencha todos os campos do formulário.");
       setIsSubmitting(false);
       return;
@@ -405,7 +415,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
       let existingUserByMatricula: Student | null = null;
 
       if (isSupabaseConfigured) {
-        existingUserByUsername = await getStudentByUsuario(username);
+        existingUserByUsername = await getStudentByUsuarioOrEmail(username);
         existingUserByMatricula = await getStudentByMatricula(matricula);
       } else {
         const localUsersStr = localStorage.getItem("sc_local_registered_users") || "[]";
@@ -415,7 +425,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
       }
 
       if (existingUserByUsername) {
-        setErrorMessage(`O usuário "${username}" já está cadastrado. Por favor, escolha outro.`);
+        setErrorMessage(`O e-mail "${username}" já está cadastrado. Por favor, escolha outro.`);
         setIsSubmitting(false);
         return;
       }
@@ -426,65 +436,79 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
         return;
       }
 
-      // Build profile object structure
-      let newUser: Student = {
-        id: `usr-${Date.now()}`,
-        matricula: matricula,
-        nome: name,
-        email: email,
-        usuario: username,
-        senha: password,
-        coins_saldo: regRole === "aluno" ? 150 : 0, // Students get 150 ClassCoins starter bonus (RN2.1)
-        xp: 0,
-        level: 1,
-        completed_quizzes_count: 0,
-        role: regRole,
-        approved: false, // New registrations must be approved! (RN5.1)
-        is_admin: false
-      };
-
       if (isSupabaseConfigured && supabase) {
-        // Try to create the user with Supabase native auth
+        // 1. Cadastra o usuário no Supabase Authentication
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: email,
           password: password,
           options: {
             data: {
               nome: name,
-              usuario: username,
+              role: regRole,
               matricula: matricula
             }
           }
         });
 
         if (authError) {
-          setErrorMessage(`Erro ao criar conta no Supabase: ${authError.message}`);
-          setIsSubmitting(false);
-          return;
+          throw authError;
         }
 
-        if (authData.user) {
-          newUser.id = authData.user.id;
+        const authUser = authData?.user;
+        if (!authUser) {
+          throw new Error("Erro ao criar usuário na autenticação do Supabase.");
         }
 
-        const success = await upsertStudent(newUser);
-        if (!success) {
-          setErrorMessage("Erro ao persistir cadastro no banco de dados. Tente novamente.");
-          setIsSubmitting(false);
-          return;
-        }
+        // 2. Cria o objeto do estudante usando o ID retornado do Supabase Auth
+        let newUser: Student = {
+          id: authUser.id,
+          matricula: matricula,
+          nome: name,
+          email: email,
+          usuario: username,
+          senha: "", // Não há necessidade de guardar a senha limpa na tabela do banco
+          coins_saldo: regRole === "aluno" ? 150 : 0, // Alunos ganham 150 ClassCoins de bônus inicial (RN2.1)
+          xp: 0,
+          level: 1,
+          completed_quizzes_count: 0,
+          role: regRole,
+          approved: false, // Novos cadastros devem ser aprovados! (RN5.1)
+          is_admin: false
+        };
+
+        // Salva os dados dele nas tabelas do banco de dados (sc_usuarios, sc_perfis_academicos, sc_saldos)
+        await upsertStudent(newUser);
+
+        // Desloga o usuário imediatamente da autenticação do Supabase na sessão do cliente,
+        // pois o login está pendente de aprovação do administrador
+        await supabase.auth.signOut();
       } else {
+        // Fallback Local
+        let newUser: Student = {
+          id: `usr-${Date.now()}`,
+          matricula: matricula,
+          nome: name,
+          email: email,
+          usuario: username,
+          senha: password,
+          coins_saldo: regRole === "aluno" ? 150 : 0,
+          xp: 0,
+          level: 1,
+          completed_quizzes_count: 0,
+          role: regRole,
+          approved: false,
+          is_admin: false
+        };
         const localUsersStr = localStorage.getItem("sc_local_registered_users") || "[]";
         const localUsers: Student[] = JSON.parse(localUsersStr);
         localUsers.push(newUser);
         localStorage.setItem("sc_local_registered_users", JSON.stringify(localUsers));
       }
 
-      setSuccessMessage("Solicitação Enviada!");
+      setSuccessMessage("Cadastro realizado com sucesso! Aguarde a aprovação do Administrador.");
 
       // Reset form fields
       setRegName("");
-      setRegUsername("");
       setRegPassword("");
       setRegEmail("");
       setRegMatricula("");
@@ -577,12 +601,12 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
               
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-mono font-bold text-[#57606A] uppercase tracking-wider flex items-center gap-1">
-                  <User className="w-3.5 h-3.5" /> Nome de Usuário
+                  <User className="w-3.5 h-3.5" /> E-mail ou Usuário
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Digite seu nome de usuário"
+                  placeholder="Digite seu e-mail ou nome de usuário"
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
                   className="w-full bg-white border border-[#D0D7DE] rounded-md p-2.5 text-xs focus:border-[#0969DA] outline-none font-sans text-[#24292F]"
@@ -644,14 +668,14 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="block text-[10px] font-mono font-bold text-[#57606A] uppercase tracking-wider">
-                    Nome de Usuário
+                    Endereço de E-mail
                   </label>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    placeholder="Ex: ana"
-                    value={regUsername}
-                    onChange={(e) => setRegUsername(e.target.value)}
+                    placeholder="Ex: ana.costa@universidade.edu.br"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
                     className="w-full bg-white border border-[#D0D7DE] rounded-md p-2 text-xs focus:border-[#0969DA] outline-none font-sans text-[#24292F]"
                   />
                 </div>
@@ -696,20 +720,6 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
                     {regRole === "aluno" ? "+150 ClassCoins" : "Docente Coordenador"}
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-[10px] font-mono font-bold text-[#57606A] uppercase tracking-wider">
-                  Endereço de E-mail
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="Ex: ana.costa@universidade.edu.br"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  className="w-full bg-white border border-[#D0D7DE] rounded-md p-2 text-xs focus:border-[#0969DA] outline-none font-sans text-[#24292F]"
-                />
               </div>
 
               {/* Role selection toggle */}

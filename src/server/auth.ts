@@ -115,4 +115,43 @@ router.post("/upsert-student", async (req, res) => {
   res.json({ success: true });
 });
 
+router.post("/delete-student", async (req, res) => {
+  const { id } = req.body;
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Configuração do Supabase ausente" });
+  }
+
+  try {
+    // 1. Deletar de sc_perfis_academicos
+    await supabaseAdmin
+      .from("sc_perfis_academicos")
+      .delete()
+      .eq("usuario_id", id);
+
+    // 2. Deletar de sc_saldos
+    await supabaseAdmin
+      .from("sc_saldos")
+      .delete()
+      .eq("usuario_id", id);
+
+    // 3. Deletar de sc_usuarios
+    await supabaseAdmin
+      .from("sc_usuarios")
+      .delete()
+      .eq("id", id);
+
+    // 4. Deletar do Supabase Auth
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(id);
+    if (authDeleteError) {
+      console.warn("Aviso ao deletar de Supabase Auth:", authDeleteError.message);
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Erro ao deletar estudante:", error);
+    res.status(500).json({ error: error.message || "Erro interno ao deletar" });
+  }
+});
+
 export default router;
