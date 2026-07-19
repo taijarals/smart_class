@@ -35,8 +35,10 @@ import {
   deleteStudent,
   getClasses,
   upsertClass,
+  deleteClass,
   getSubjects,
   upsertSubject,
+  deleteSubject,
   getQuestions,
   upsertQuestion,
   deleteQuestionFromSupabase,
@@ -48,8 +50,10 @@ import {
   insertCompletedQuiz,
   getCourses,
   upsertCourse,
+  deleteCourse,
   getDisciplines,
-  upsertDiscipline
+  upsertDiscipline,
+  deleteDiscipline,
 } from "./lib/supabase";
 
 // Extracted Modular Components
@@ -60,7 +64,7 @@ import StoreView from "./components/StoreView";
 import ProfessorDashboard from "./components/ProfessorDashboard";
 import AccessManagement from "./components/AccessManagement";
 import ManageQuestions from "./components/ManageQuestions";
-import ManageCourses from "./components/ManageCourses";
+import { ManageCourses } from "./components/ManageCourses";
 import StudentProfile from "./components/StudentProfile";
 import LoginView from "./components/LoginView";
 
@@ -285,23 +289,7 @@ export default function App() {
 
         // Ensure taijara@gmail.com is present
         const hasTaijaraLocal = localUsers.some(u => u.email?.toLowerCase() === "taijara@gmail.com");
-        if (!hasTaijaraLocal) {
-          localUsers.push({
-            id: "usr-admin-taijara",
-            matricula: "000000-1",
-            nome: "Taijara Admin",
-            email: "taijara@gmail.com",
-            usuario: "taijara",
-            senha: "admin123",
-            coins_saldo: 0,
-            xp: 10000,
-            level: 99,
-            completed_quizzes_count: 0,
-            role: "professor" as const,
-            approved: true,
-            is_admin: true
-          });
-        }
+        // REMOVED HARDCODED BACKDOOR
 
         localStorage.setItem("sc_local_registered_users", JSON.stringify(localUsers));
         setUsersList(localUsers);
@@ -529,6 +517,34 @@ export default function App() {
     }
   };
 
+  const handleDeleteCourse = (id: number) => {
+    setCourses((prev) => prev.filter((c) => c.id !== id));
+    if (isSupabaseConfigured) {
+      deleteCourse(id);
+    }
+  };
+
+  const handleDeleteDiscipline = (id: number) => {
+    setDisciplines((prev) => prev.filter((d) => d.id !== id));
+    if (isSupabaseConfigured) {
+      deleteDiscipline(id);
+    }
+  };
+
+  const handleDeleteSubject = (id: number) => {
+    setSubjects((prev) => prev.filter((s) => s.id !== id));
+    if (isSupabaseConfigured) {
+      deleteSubject(id);
+    }
+  };
+
+  const handleDeleteClass = (id: number) => {
+    setClasses((prev) => prev.filter((c) => c.id !== id));
+    if (isSupabaseConfigured) {
+      deleteClass(id);
+    }
+  };
+
   // Handlers for subject/class management
   const handleUpsertSubject = (s: Subject) => {
     setSubjects(prev => {
@@ -566,7 +582,11 @@ export default function App() {
       }
       return [...prev, c];
     });
-    if (isSupabaseConfigured) upsertCourse(c);
+    if (isSupabaseConfigured) {
+      upsertCourse(c).then(success => {
+        if (!success) console.error("Failed to save course");
+      });
+    }
   };
 
   const handleUpsertClass = (c: Class) => {
@@ -705,14 +725,18 @@ export default function App() {
                 disciplines={disciplines}
                 subjects={subjects}
                 classes={classes}
-                onAddCourse={(c) => handleUpsertCourse({ ...c, id: Date.now() })}
+                onAddCourse={(c) => handleUpsertCourse({ ...c, id: Math.floor(Date.now() / 1000) })}
                 onUpdateCourse={handleUpsertCourse}
-                onAddDiscipline={(d) => handleUpsertDiscipline({ ...d, id: Date.now() })}
+                onDeleteCourse={handleDeleteCourse}
+                onAddDiscipline={(d) => handleUpsertDiscipline({ ...d, id: Math.floor(Date.now() / 1000) })}
                 onUpdateDiscipline={handleUpsertDiscipline}
-                onAddSubject={(s) => handleUpsertSubject({ ...s, id: Date.now() })}
+                onDeleteDiscipline={handleDeleteDiscipline}
+                onAddSubject={(s) => handleUpsertSubject({ ...s, id: Math.floor(Date.now() / 1000) })}
                 onUpdateSubject={handleUpsertSubject}
-                onAddClass={(c) => handleUpsertClass({ ...c, id: Date.now() })}
+                onDeleteSubject={handleDeleteSubject}
+                onAddClass={(c) => handleUpsertClass({ ...c, id: Math.floor(Date.now() / 1000) })}
                 onUpdateClass={handleUpsertClass}
+                onDeleteClass={handleDeleteClass}
                 onGoBack={() => setProfessorScreen("dashboard")}
               />
             )}

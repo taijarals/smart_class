@@ -26,6 +26,7 @@ export interface Course {
 
 export interface Discipline {
   id: number;
+  curso_id: number;
   nome: string;
 }
 
@@ -46,12 +47,14 @@ export interface Question {
   status: boolean; // Se está ativa
 }
 
-export interface Class {
+export interface Class { // This represents Turma
   id: number;
-  data_aula: string; // Ex: "SET 24"
-  titulo: string;
+  curso_id: number;
+  disciplina_id: number;
+  ano: number;
+  periodo: string; // "1º semestre", "2º semestre", "1º trimestre", "2º trimestre", "3º trimestre", "4º trimestre"
+  dia_da_semana: string;
   horario: string; // Ex: "08:30 - 10:10"
-  local: string; // Ex: "Lab 402"
   checkin_ativo: boolean; // Ativado pelo professor no início da aula
 }
 

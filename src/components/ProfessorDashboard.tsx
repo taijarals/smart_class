@@ -47,7 +47,7 @@ export default function ProfessorDashboard({
           <h2 className="font-sans font-bold text-lg text-[#24292F] tracking-tight">
             Dashboard do Professor
           </h2>
-          <p className="font-sans text-xs text-[#57606A]">Olá, Prof. Ricardo. Confira as atividades pedagógicas de hoje.</p>
+          <p className="font-sans text-xs text-[#57606A]">Olá, Prof. {student.nome}. Confira as atividades pedagógicas de hoje.</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -142,16 +142,15 @@ export default function ProfessorDashboard({
                     {/* Date Block */}
                     <div className="w-10 h-10 rounded bg-[#F6F8FA] border border-[#D0D7DE] flex flex-col items-center justify-center text-[#0969DA] font-bold shrink-0">
                       <span className="text-[8px] font-mono tracking-tighter uppercase text-[#57606A] leading-none mb-0.5">
-                        {cls.data_aula.split(" ")[0]}
+                        {cls.dia_da_semana.substring(0, 3)}
                       </span>
                       <span className="text-sm font-sans leading-none">
-                        {cls.data_aula.split(" ")[1]}
+                        {cls.horario.split(":")[0]}
                       </span>
                     </div>
-
                     <div>
                       <h4 className="font-sans font-bold text-xs text-[#24292F] leading-snug">
-                        {cls.titulo}
+                        {cls.dia_da_semana}
                       </h4>
                       <div className="flex items-center gap-2 text-[11px] text-[#57606A] mt-1 font-sans">
                         <span className="flex items-center gap-1">
@@ -159,7 +158,7 @@ export default function ProfessorDashboard({
                           {cls.horario}
                         </span>
                         <span>•</span>
-                        <span>Lab {cls.local}</span>
+                        <span>{cls.periodo} {cls.ano}</span>
                       </div>
                     </div>
                   </div>

@@ -93,7 +93,7 @@ export default function StudentProfile({ student, redemptionLogs, completedQuizz
                 return (
                   <div key={q.id} className="p-2 bg-[#F6F8FA] border border-[#D0D7DE] rounded-md flex items-center justify-between gap-3 text-xs">
                     <div className="space-y-0.5">
-                      <p className="font-semibold text-[#24292F] line-clamp-1">{matchedClass?.titulo || "Aula do dia"}</p>
+                      <p className="font-semibold text-[#24292F] line-clamp-1">{matchedClass ? `${matchedClass.dia_da_semana} - ${matchedClass.horario}` : "Aula do dia"}</p>
                       <p className="text-[9px] text-[#57606A] font-mono">{q.finalizado_em}</p>
                     </div>
                     <div className="text-right shrink-0">

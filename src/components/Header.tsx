@@ -78,18 +78,6 @@ export default function Header({
 
       {/* Action center with Selector and Coin Display */}
       <div className="flex items-center gap-2">
-        {/* Admin Access Management Quick Link */}
-        {student?.is_admin && onClickAccessManagement && (
-          <button
-            onClick={onClickAccessManagement}
-            title="Ambiente de Gestão de Acessos (Admin)"
-            className="flex items-center gap-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-2.5 py-1 rounded-md text-[11px] font-sans font-bold transition-all shadow-sm cursor-pointer"
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-purple-700" />
-            <span className="hidden sm:inline">Gestão de Acessos</span>
-          </button>
-        )}
-
         {/* Role toggle switcher */}
         <div className="flex bg-[#F6F8FA] rounded-md p-0.5 border border-[#D0D7DE]">
           <button

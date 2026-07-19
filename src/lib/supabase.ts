@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { Student, Class, Subject, Question, EnrollmentRequest, RedemptionLog, QuizAttempt } from "../types";
+import { Student, Class, Course, Discipline, Subject, Question, EnrollmentRequest, RedemptionLog, QuizAttempt } from "../types";
 
 // Read Supabase credentials from client-side environment variables
 const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
@@ -10,11 +10,7 @@ export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 let supabaseClient: any = null;
 try {
   supabaseClient = isSupabaseConfigured
-    ? createClient(supabaseUrl!, supabaseAnonKey!, {
-        db: {
-          schema: 'smartclass',
-        },
-      })
+    ? createClient(supabaseUrl!, supabaseAnonKey!, { db: { schema: 'smartclass' } })
     : null;
   if (isSupabaseConfigured) {
     console.log("Supabase initialized with URL:", supabaseUrl);
@@ -65,7 +61,6 @@ export async function getStudent(id: string): Promise<Student | null> {
         nome,
         email,
         usuario,
-        senha,
         role,
         approved,
         is_admin,
@@ -75,14 +70,10 @@ export async function getStudent(id: string): Promise<Student | null> {
       .eq("id", id)
       .maybeSingle();
 
-    if (error) {
-      console.error("Error fetching student from Supabase:", error);
-      return null;
-    }
-    if (!data) return null;
+    if (error || !data) return null;
     return mapToStudent(data);
   } catch (err) {
-    console.error("Supabase exception:", err);
+    console.error("API exception:", err);
     return null;
   }
 }
@@ -117,7 +108,6 @@ export async function getStudentByUsuario(usuario: string): Promise<Student | nu
         nome,
         email,
         usuario,
-        senha,
         role,
         approved,
         is_admin,
@@ -149,7 +139,6 @@ export async function getStudentByUsuarioOrEmail(identifier: string): Promise<St
         nome,
         email,
         usuario,
-        senha,
         role,
         approved,
         is_admin,
@@ -181,20 +170,18 @@ export async function getStudents(): Promise<Student[] | null> {
         nome,
         email,
         usuario,
-        senha,
         role,
         approved,
         is_admin,
         sc_perfis_academicos (matricula, xp, level, completed_quizzes_count),
         sc_saldos (coins_saldo)
-      `)
-      .order("nome", { ascending: true });
-
+      `);
+      
     if (error) {
-      console.error("Error fetching all students from Supabase:", error);
+      console.error("Error fetching students from Supabase:", error);
       return null;
     }
-    return (data || []).map(mapToStudent);
+    return data ? data.map(mapToStudent) : null;
   } catch (err) {
     console.error("Supabase exception getting students:", err);
     return null;
@@ -202,12 +189,13 @@ export async function getStudents(): Promise<Student[] | null> {
 }
 
 export async function upsertStudent(student: Student): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
   try {
-    // 1. Upsert sc_usuarios
-    const { error: userError } = await supabase
-      .from("sc_usuarios")
-      .upsert({
+    const response = await fetch("/api/auth/upsert-student", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
         id: student.id,
         nome: student.nome,
         email: student.email,
@@ -215,41 +203,18 @@ export async function upsertStudent(student: Student): Promise<boolean> {
         senha: student.senha || "",
         role: student.role || "aluno",
         approved: student.approved ?? false,
-        is_admin: student.is_admin ?? false
-      });
-
-    if (userError) {
-      console.error("Error upserting sc_usuarios:", userError);
-      throw new Error(`Erro na tabela 'sc_usuarios': ${userError.message || 'Falha de rede'}. Verifique se o Supabase está acessível e as tabelas foram criadas.`);
-    }
-
-    // 2. Upsert sc_perfis_academicos
-    const { error: perfilError } = await supabase
-      .from("sc_perfis_academicos")
-      .upsert({
-        usuario_id: student.id,
+        is_admin: student.is_admin ?? false,
         matricula: student.matricula || "",
         xp: student.xp ?? 0,
         level: student.level ?? 1,
-        completed_quizzes_count: student.completed_quizzes_count ?? 0
-      });
-
-    if (perfilError) {
-      console.error("Error upserting sc_perfis_academicos:", perfilError);
-      throw new Error(`Erro na tabela 'sc_perfis_academicos': ${perfilError.message} (Código: ${perfilError.code}).`);
-    }
-
-    // 3. Upsert sc_saldos
-    const { error: saldoError } = await supabase
-      .from("sc_saldos")
-      .upsert({
-        usuario_id: student.id,
+        completed_quizzes_count: student.completed_quizzes_count ?? 0,
         coins_saldo: student.coins_saldo ?? 150
-      });
+      }),
+    });
 
-    if (saldoError) {
-      console.error("Error upserting sc_saldos:", saldoError);
-      throw new Error(`Erro na tabela 'sc_saldos': ${saldoError.message} (Código: ${saldoError.code}).`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Falha ao persistir cadastro");
     }
 
     return true;
@@ -318,7 +283,7 @@ export async function getClasses(): Promise<Class[] | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
     const { data, error } = await supabase
-      .from("sc_aulas")
+      .from("sc_turmas")
       .select("*")
       .order("id", { ascending: true });
 
@@ -337,10 +302,12 @@ export async function upsertClass(cls: Class): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
     const { error } = await supabase
-      .from("sc_aulas")
+      .from("sc_turmas")
       .upsert(cls);
+    if (error) console.error("Error upserting class:", error);
     return !error;
-  } catch {
+  } catch (err) {
+    console.error("Exception upserting class:", err);
     return false;
   }
 }
@@ -370,8 +337,10 @@ export async function upsertCourse(c: Course): Promise<boolean> {
     const { error } = await supabase
       .from("sc_cursos")
       .upsert(c);
+    if (error) console.error("Error upserting course:", error);
     return !error;
-  } catch {
+  } catch (err) {
+    console.error("Exception upserting course:", err);
     return false;
   }
 }
@@ -401,8 +370,10 @@ export async function upsertDiscipline(d: Discipline): Promise<boolean> {
     const { error } = await supabase
       .from("sc_disciplinas")
       .upsert(d);
+    if (error) console.error("Error upserting discipline:", error);
     return !error;
-  } catch {
+  } catch (err) {
+    console.error("Exception upserting discipline:", err);
     return false;
   }
 }
@@ -432,8 +403,10 @@ export async function upsertSubject(sub: Subject): Promise<boolean> {
     const { error } = await supabase
       .from("sc_assuntos")
       .upsert(sub);
+    if (error) console.error("Error upserting subject:", error);
     return !error;
-  } catch {
+  } catch (err) {
+    console.error("Exception upserting subject:", err);
     return false;
   }
 }
@@ -441,18 +414,14 @@ export async function upsertSubject(sub: Subject): Promise<boolean> {
 export async function getQuestions(): Promise<Question[] | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const { data, error } = await supabase
-      .from("sc_questoes")
-      .select("*")
-      .order("id", { ascending: true });
-
+    const { data, error } = await supabase.from("sc_questoes").select("*");
     if (error) {
-      console.error("Error fetching questions from Supabase:", error);
+      console.error("Error getting questions:", error);
       return null;
     }
     return data;
   } catch (err) {
-    console.error(err);
+    console.error("Supabase exception getting questions:", err);
     return null;
   }
 }
@@ -482,21 +451,69 @@ export async function deleteQuestionFromSupabase(id: string): Promise<boolean> {
   }
 }
 
+export async function deleteCourse(id: number): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase
+      .from("sc_cursos")
+      .delete()
+      .eq("id", id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteDiscipline(id: number): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase
+      .from("sc_disciplinas")
+      .delete()
+      .eq("id", id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSubject(id: number): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase
+      .from("sc_assuntos")
+      .delete()
+      .eq("id", id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteClass(id: number): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase
+      .from("sc_turmas")
+      .delete()
+      .eq("id", id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function getRequests(): Promise<EnrollmentRequest[] | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const { data, error } = await supabase
-      .from("sc_solicitacoes")
-      .select("*")
-      .order("id", { ascending: false });
-
+    const { data, error } = await supabase.from("sc_solicitacoes").select("*");
     if (error) {
-      console.error("Error fetching enrollment requests:", error);
+      console.error("Error getting requests:", error);
       return null;
     }
     return data;
   } catch (err) {
-    console.error(err);
+    console.error("Supabase exception getting requests:", err);
     return null;
   }
 }
@@ -516,18 +533,14 @@ export async function upsertRequest(req: EnrollmentRequest): Promise<boolean> {
 export async function getRedemptionLogs(): Promise<RedemptionLog[] | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const { data, error } = await supabase
-      .from("sc_resgates")
-      .select("*")
-      .order("id", { ascending: false });
-
+    const { data, error } = await supabase.from("sc_resgates").select("*");
     if (error) {
-      console.error("Error fetching redemption logs:", error);
+      console.error("Error getting redemption logs:", error);
       return null;
     }
     return data;
   } catch (err) {
-    console.error(err);
+    console.error("Supabase exception getting redemption logs:", err);
     return null;
   }
 }
@@ -547,18 +560,14 @@ export async function insertRedemptionLog(log: RedemptionLog): Promise<boolean> 
 export async function getCompletedQuizzes(): Promise<QuizAttempt[] | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const { data, error } = await supabase
-      .from("sc_checkins_quiz")
-      .select("*")
-      .order("id", { ascending: false });
-
+    const { data, error } = await supabase.from("sc_checkins_quiz").select("*");
     if (error) {
-      console.error("Error fetching quiz checkins:", error);
+      console.error("Error getting completed quizzes:", error);
       return null;
     }
     return data;
   } catch (err) {
-    console.error(err);
+    console.error("Supabase exception getting completed quizzes:", err);
     return null;
   }
 }

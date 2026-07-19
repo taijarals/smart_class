@@ -1,6 +1,6 @@
 import React, { useState } from "react";
+import { PlusCircle, Edit, Save, X, Book, BookOpen, Calendar, GraduationCap } from "lucide-react";
 import { Subject, Class, Discipline, Course } from "../types";
-import { PlusCircle, Edit, BookOpen, Calendar, Save, X, Book, GraduationCap } from "lucide-react";
 
 interface ManageCoursesProps {
   courses: Course[];
@@ -9,227 +9,466 @@ interface ManageCoursesProps {
   classes: Class[];
   onAddCourse: (c: Omit<Course, "id">) => void;
   onUpdateCourse: (c: Course) => void;
-  onAddDiscipline: (d: Omit<Discipline, "id">) => void;
-  onUpdateDiscipline: (d: Discipline) => void;
+  onDeleteCourse: (id: number) => void;
+  onAddDiscipline: (c: Omit<Discipline, "id">) => void;
+  onUpdateDiscipline: (c: Discipline) => void;
+  onDeleteDiscipline: (id: number) => void;
   onAddSubject: (s: Omit<Subject, "id">) => void;
   onUpdateSubject: (s: Subject) => void;
+  onDeleteSubject: (id: number) => void;
   onAddClass: (c: Omit<Class, "id">) => void;
   onUpdateClass: (c: Class) => void;
+  onDeleteClass: (id: number) => void;
   onGoBack: () => void;
 }
 
-export default function ManageCourses({ courses, disciplines, subjects, classes, onAddCourse, onUpdateCourse, onAddDiscipline, onUpdateDiscipline, onAddSubject, onUpdateSubject, onAddClass, onUpdateClass, onGoBack }: ManageCoursesProps) {
+type TabType = "cursos" | "disciplinas" | "assuntos" | "turmas";
+
+export const ManageCourses: React.FC<ManageCoursesProps> = ({
+  courses, disciplines, subjects, classes,
+  onAddCourse, onUpdateCourse, onDeleteCourse,
+  onAddDiscipline, onUpdateDiscipline, onDeleteDiscipline,
+  onAddSubject, onUpdateSubject, onDeleteSubject,
+  onAddClass, onUpdateClass, onDeleteClass, onGoBack
+}) => {
+  const [activeTab, setActiveTab] = useState<TabType>("cursos");
+
+  // Local state for editing forms
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [editingDiscipline, setEditingDiscipline] = useState<Discipline | null>(null);
-  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
-  const [editingClass, setEditingClass] = useState<Class | null>(null);
-  
   const [courseForm, setCourseForm] = useState<Partial<Course>>({});
+
+  const [editingDiscipline, setEditingDiscipline] = useState<Discipline | null>(null);
   const [disciplineForm, setDisciplineForm] = useState<Partial<Discipline>>({});
+
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [subjectForm, setSubjectForm] = useState<Partial<Subject>>({});
+
+  const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [classForm, setClassForm] = useState<Partial<Class>>({});
 
+  // Handlers for Course
   const startEditCourse = (c: Course) => {
     setEditingCourse(c);
     setCourseForm(c);
   };
-
   const saveCourse = () => {
-    if (editingCourse) {
+    if (editingCourse && editingCourse.id !== -1) {
       onUpdateCourse({ ...editingCourse, ...courseForm } as Course);
-      setEditingCourse(null);
     } else {
       onAddCourse({ nome: courseForm.nome || "Novo Curso" });
     }
+    setEditingCourse(null);
     setCourseForm({});
   };
 
+  // Handlers for Discipline
   const startEditDiscipline = (d: Discipline) => {
     setEditingDiscipline(d);
     setDisciplineForm(d);
   };
-
   const saveDiscipline = () => {
-    if (editingDiscipline) {
+    if (editingDiscipline && editingDiscipline.id !== -1) {
       onUpdateDiscipline({ ...editingDiscipline, ...disciplineForm } as Discipline);
-      setEditingDiscipline(null);
     } else {
-      onAddDiscipline({ nome: disciplineForm.nome || "Nova Disciplina" });
+      onAddDiscipline({ 
+        nome: disciplineForm.nome || "Nova Disciplina",
+        curso_id: disciplineForm.curso_id || 0
+      });
     }
+    setEditingDiscipline(null);
     setDisciplineForm({});
   };
 
+  // Handlers for Subject
   const startEditSubject = (s: Subject) => {
     setEditingSubject(s);
     setSubjectForm(s);
   };
-
   const saveSubject = () => {
-    if (editingSubject) {
+    if (editingSubject && editingSubject.id !== -1) {
       onUpdateSubject({ ...editingSubject, ...subjectForm } as Subject);
-      setEditingSubject(null);
     } else {
-      onAddSubject({ nome: subjectForm.nome || "Novo Assunto", disciplina_id: subjectForm.disciplina_id || 0, status: subjectForm.status ?? true });
+      onAddSubject({ 
+        nome: subjectForm.nome || "Novo Assunto", 
+        disciplina_id: subjectForm.disciplina_id || 0, 
+        status: subjectForm.status ?? true 
+      });
     }
+    setEditingSubject(null);
     setSubjectForm({});
   };
 
+  // Handlers for Class (Turma)
   const startEditClass = (c: Class) => {
     setEditingClass(c);
     setClassForm(c);
   };
-
   const saveClass = () => {
-    if (editingClass) {
+    if (editingClass && editingClass.id !== -1) {
       onUpdateClass({ ...editingClass, ...classForm } as Class);
-      setEditingClass(null);
     } else {
       onAddClass({ 
-        titulo: classForm.titulo || "Nova Aula", 
-        data_aula: classForm.data_aula || "SET 00", 
-        horario: classForm.horario || "00:00", 
-        local: classForm.local || "Local", 
+        curso_id: classForm.curso_id || 0,
+        disciplina_id: classForm.disciplina_id || 0,
+        ano: classForm.ano || new Date().getFullYear(),
+        periodo: classForm.periodo || "1º semestre",
+        dia_da_semana: classForm.dia_da_semana || "Segunda-feira",
+        horario: classForm.horario || "08:00 - 10:00",
         checkin_ativo: classForm.checkin_ativo ?? false 
       });
     }
+    setEditingClass(null);
     setClassForm({});
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <button onClick={onGoBack} className="text-xs font-bold text-[#0969DA] hover:underline">← Voltar para Dashboard</button>
-        <h2 className="text-lg font-bold">Gestão de Cursos e Aulas</h2>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center bg-white p-4 rounded-md border border-[#D0D7DE]">
+        <h2 className="text-base font-bold text-[#24292F]">Gestão de Cursos e Turmas</h2>
+        <button onClick={onGoBack} className="text-sm font-bold text-[#0969DA] hover:underline">
+          Voltar ao Dashboard
+        </button>
+      </div>
+      
+      {/* Navigation Tabs */}
+      <div className="flex bg-white rounded-md border border-[#D0D7DE] overflow-hidden">
+        {(["cursos", "disciplinas", "assuntos", "turmas"] as TabType[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              setActiveTab(tab);
+              // reset forms when switching tabs
+              setEditingCourse(null);
+              setEditingDiscipline(null);
+              setEditingSubject(null);
+              setEditingClass(null);
+            }}
+            className={`flex-1 p-3 text-sm font-bold capitalize border-b-2 transition-colors ${
+              activeTab === tab 
+                ? "border-[#0969DA] text-[#0969DA] bg-blue-50/50" 
+                : "border-transparent text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      {/* Courses Section */}
-      <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
-        <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
-          <GraduationCap className="w-4 h-4 text-[#0969DA]" /> Cursos
-        </h3>
-        {editingCourse ? (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-2">
-            <input value={courseForm.nome || ""} onChange={e => setCourseForm({...courseForm, nome: e.target.value})} className="w-full p-2 text-sm border rounded" placeholder="Nome do curso" />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditingCourse(null)} className="p-1"><X className="w-4 h-4" /></button>
-              <button onClick={saveCourse} className="p-1 text-[#0969DA]"><Save className="w-4 h-4" /></button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {courses.map(c => (
-              <div key={c.id} className="flex justify-between items-center p-2 bg-[#F6F8FA] rounded">
-                <span>{c.nome}</span>
-                <button onClick={() => startEditCourse(c)} className="p-1 hover:bg-gray-200 rounded"><Edit className="w-3.5 h-3.5"/></button>
-              </div>
-            ))}
-            <button onClick={() => { setEditingCourse({id: -1, nome: ""}); setCourseForm({nome: ""}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-2">
-              <PlusCircle className="w-4 h-4" /> Adicionar Curso
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* Disciplines Section */}
-      <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
-        <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
-          <Book className="w-4 h-4 text-[#0969DA]" /> Disciplinas
-        </h3>
-        {editingDiscipline ? (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-2">
-            <input value={disciplineForm.nome || ""} onChange={e => setDisciplineForm({...disciplineForm, nome: e.target.value})} className="w-full p-2 text-sm border rounded" placeholder="Nome da disciplina" />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditingDiscipline(null)} className="p-1"><X className="w-4 h-4" /></button>
-              <button onClick={saveDiscipline} className="p-1 text-[#0969DA]"><Save className="w-4 h-4" /></button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {disciplines.map(d => (
-              <div key={d.id} className="flex justify-between items-center p-2 bg-[#F6F8FA] rounded">
-                <span>{d.nome}</span>
-                <button onClick={() => startEditDiscipline(d)} className="p-1 hover:bg-gray-200 rounded"><Edit className="w-3.5 h-3.5"/></button>
-              </div>
-            ))}
-            <button onClick={() => { setEditingDiscipline({id: -1, nome: ""}); setDisciplineForm({nome: ""}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-2">
-              <PlusCircle className="w-4 h-4" /> Adicionar Disciplina
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* Subjects Section */}
-      <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
-        <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
-          <BookOpen className="w-4 h-4 text-[#0969DA]" /> Assuntos (por Disciplina)
-        </h3>
-        {editingSubject ? (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-2">
-            <input value={subjectForm.nome || ""} onChange={e => setSubjectForm({...subjectForm, nome: e.target.value})} className="w-full p-2 text-sm border rounded" placeholder="Nome do assunto" />
-            <select value={subjectForm.disciplina_id || 0} onChange={e => setSubjectForm({...subjectForm, disciplina_id: parseInt(e.target.value)})} className="w-full p-2 text-sm border rounded">
-              <option value={0}>Selecione uma disciplina</option>
-              {disciplines.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
-            </select>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={subjectForm.status ?? true} onChange={e => setSubjectForm({...subjectForm, status: e.target.checked})} />
-              Ativo
-            </label>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditingSubject(null)} className="p-1"><X className="w-4 h-4" /></button>
-              <button onClick={saveSubject} className="p-1 text-[#0969DA]"><Save className="w-4 h-4" /></button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {subjects.map(s => {
-              const d = disciplines.find(d => d.id === s.disciplina_id);
-              return (
-                <div key={s.id} className="flex justify-between items-center p-2 bg-[#F6F8FA] rounded">
-                  <span>{s.nome} ({d?.nome || 'Sem Disciplina'}) - {s.status ? 'Ativo' : 'Inativo'}</span>
-                  <button onClick={() => startEditSubject(s)} className="p-1 hover:bg-gray-200 rounded"><Edit className="w-3.5 h-3.5"/></button>
+      {/* Cursos Tab */}
+      {activeTab === "cursos" && (
+        <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
+            <GraduationCap className="w-4 h-4 text-[#0969DA]" /> Cursos
+          </h3>
+          {editingCourse ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-2">
+              <input 
+                value={courseForm.nome || ""} 
+                onChange={e => setCourseForm({...courseForm, nome: e.target.value})} 
+                className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none" 
+                placeholder="Nome do curso" 
+              />
+              <div className="flex justify-between gap-2">
+                {editingCourse.id !== -1 ? (
+                  <button onClick={() => { onDeleteCourse(editingCourse.id); setEditingCourse(null); }} className="p-1 text-red-600 hover:bg-red-50 rounded font-medium text-sm px-2">Deletar</button>
+                ) : <div/>}
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingCourse(null)} className="p-1 text-gray-500 hover:bg-gray-200 rounded"><X className="w-4 h-4" /></button>
+                  <button onClick={saveCourse} className="flex items-center gap-1 px-3 py-1 bg-[#0969DA] text-white rounded font-bold text-xs hover:bg-blue-700"><Save className="w-4 h-4" /> Salvar</button>
                 </div>
-              );
-            })}
-            <button onClick={() => { setEditingSubject({id: -1, nome: "", disciplina_id: 0, status: true}); setSubjectForm({nome: "", disciplina_id: 0, status: true}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-2">
-              <PlusCircle className="w-4 h-4" /> Adicionar Assunto
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* Classes Section */}
-      <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
-        <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
-          <Calendar className="w-4 h-4 text-[#0969DA]" /> Aulas Agendadas
-        </h3>
-        {editingClass ? (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-2">
-            <input value={classForm.titulo || ""} onChange={e => setClassForm({...classForm, titulo: e.target.value})} className="w-full p-2 text-sm border rounded" placeholder="Título" />
-            <input value={classForm.data_aula || ""} onChange={e => setClassForm({...classForm, data_aula: e.target.value})} className="w-full p-2 text-sm border rounded" placeholder="Data (ex: SET 00)" />
-            <input value={classForm.horario || ""} onChange={e => setClassForm({...classForm, horario: e.target.value})} className="w-full p-2 text-sm border rounded" placeholder="Horário (ex: 00:00)" />
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={classForm.checkin_ativo ?? false} onChange={e => setClassForm({...classForm, checkin_ativo: e.target.checked})} />
-              Check-in Ativo
-            </label>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditingClass(null)} className="p-1"><X className="w-4 h-4" /></button>
-              <button onClick={saveClass} className="p-1 text-[#0969DA]"><Save className="w-4 h-4" /></button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {classes.map(c => (
-              <div key={c.id} className="flex justify-between items-center p-2 bg-[#F6F8FA] rounded">
-                <span>{c.titulo} - {c.data_aula} ({c.horario})</span>
-                <button onClick={() => startEditClass(c)} className="p-1 hover:bg-gray-200 rounded"><Edit className="w-3.5 h-3.5"/></button>
               </div>
-            ))}
-            <button onClick={() => { setEditingClass({id: -1, titulo: "", data_aula: "", horario: "", local: "", checkin_ativo: false}); setClassForm({titulo: "", data_aula: "", horario: "", checkin_ativo: false}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-2">
-              <PlusCircle className="w-4 h-4" /> Adicionar Aula
-            </button>
-          </div>
-        )}
-      </section>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {courses.map(c => (
+                <div key={c.id} className="flex justify-between items-center p-3 bg-[#F6F8FA] rounded border border-transparent hover:border-gray-200">
+                  <span className="font-medium text-sm text-gray-800">{c.nome}</span>
+                  <button onClick={() => startEditCourse(c)} className="p-1.5 hover:bg-white border shadow-sm rounded text-gray-600"><Edit className="w-3.5 h-3.5"/></button>
+                </div>
+              ))}
+              {courses.length === 0 && <p className="text-sm text-gray-500 italic p-2">Nenhum curso cadastrado.</p>}
+              <button onClick={() => { setEditingCourse({id: -1, nome: ""}); setCourseForm({nome: ""}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-4 p-2 border border-dashed border-blue-300 rounded hover:bg-blue-50">
+                <PlusCircle className="w-4 h-4" /> Adicionar Curso
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Disciplinas Tab */}
+      {activeTab === "disciplinas" && (
+        <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
+            <Book className="w-4 h-4 text-[#0969DA]" /> Disciplinas
+          </h3>
+          {editingDiscipline ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Nome da Disciplina</label>
+                <input 
+                  value={disciplineForm.nome || ""} 
+                  onChange={e => setDisciplineForm({...disciplineForm, nome: e.target.value})} 
+                  className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none" 
+                  placeholder="Nome da disciplina" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Curso Vinculado</label>
+                <select 
+                  value={disciplineForm.curso_id || 0} 
+                  onChange={e => setDisciplineForm({...disciplineForm, curso_id: parseInt(e.target.value)})} 
+                  className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none"
+                >
+                  <option value={0}>Selecione um curso</option>
+                  {courses.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+              <div className="flex justify-between gap-2 pt-2 border-t border-blue-100">
+                {editingDiscipline.id !== -1 ? (
+                  <button onClick={() => { onDeleteDiscipline(editingDiscipline.id); setEditingDiscipline(null); }} className="p-1 text-red-600 hover:bg-red-50 rounded font-medium text-sm px-2">Deletar</button>
+                ) : <div/>}
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingDiscipline(null)} className="p-1 text-gray-500 hover:bg-gray-200 rounded"><X className="w-4 h-4" /></button>
+                  <button onClick={saveDiscipline} className="flex items-center gap-1 px-3 py-1 bg-[#0969DA] text-white rounded font-bold text-xs hover:bg-blue-700"><Save className="w-4 h-4" /> Salvar</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {disciplines.map(d => {
+                const c = courses.find(c => c.id === d.curso_id);
+                return (
+                  <div key={d.id} className="flex justify-between items-center p-3 bg-[#F6F8FA] rounded border border-transparent hover:border-gray-200">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm text-gray-800">{d.nome}</span>
+                      <span className="text-xs text-gray-500">{c ? c.nome : 'Sem Curso Vinculado'}</span>
+                    </div>
+                    <button onClick={() => startEditDiscipline(d)} className="p-1.5 hover:bg-white border shadow-sm rounded text-gray-600"><Edit className="w-3.5 h-3.5"/></button>
+                  </div>
+                );
+              })}
+              {disciplines.length === 0 && <p className="text-sm text-gray-500 italic p-2">Nenhuma disciplina cadastrada.</p>}
+              <button onClick={() => { setEditingDiscipline({id: -1, nome: "", curso_id: 0}); setDisciplineForm({nome: "", curso_id: 0}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-4 p-2 border border-dashed border-blue-300 rounded hover:bg-blue-50">
+                <PlusCircle className="w-4 h-4" /> Adicionar Disciplina
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Assuntos Tab */}
+      {activeTab === "assuntos" && (
+        <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
+            <BookOpen className="w-4 h-4 text-[#0969DA]" /> Assuntos (por Disciplina)
+          </h3>
+          {editingSubject ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Nome do Assunto</label>
+                <input 
+                  value={subjectForm.nome || ""} 
+                  onChange={e => setSubjectForm({...subjectForm, nome: e.target.value})} 
+                  className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none" 
+                  placeholder="Nome do assunto" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Disciplina Vinculada</label>
+                <select 
+                  value={subjectForm.disciplina_id || 0} 
+                  onChange={e => setSubjectForm({...subjectForm, disciplina_id: parseInt(e.target.value)})} 
+                  className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none"
+                >
+                  <option value={0}>Selecione uma disciplina</option>
+                  {disciplines.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input type="checkbox" checked={subjectForm.status ?? true} onChange={e => setSubjectForm({...subjectForm, status: e.target.checked})} className="rounded text-[#0969DA] focus:ring-[#0969DA]" />
+                Ativo para Quizzes
+              </label>
+              <div className="flex justify-between gap-2 pt-2 border-t border-blue-100">
+                {editingSubject.id !== -1 ? (
+                  <button onClick={() => { onDeleteSubject(editingSubject.id); setEditingSubject(null); }} className="p-1 text-red-600 hover:bg-red-50 rounded font-medium text-sm px-2">Deletar</button>
+                ) : <div/>}
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingSubject(null)} className="p-1 text-gray-500 hover:bg-gray-200 rounded"><X className="w-4 h-4" /></button>
+                  <button onClick={saveSubject} className="flex items-center gap-1 px-3 py-1 bg-[#0969DA] text-white rounded font-bold text-xs hover:bg-blue-700"><Save className="w-4 h-4" /> Salvar</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {subjects.map(s => {
+                const d = disciplines.find(d => d.id === s.disciplina_id);
+                return (
+                  <div key={s.id} className="flex justify-between items-center p-3 bg-[#F6F8FA] rounded border border-transparent hover:border-gray-200">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm text-gray-800">{s.nome}</span>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-500">{d?.nome || 'Sem Disciplina'}</span>
+                        <span>&bull;</span>
+                        <span className={s.status ? 'text-green-600' : 'text-gray-400'}>{s.status ? 'Ativo' : 'Inativo'}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => startEditSubject(s)} className="p-1.5 hover:bg-white border shadow-sm rounded text-gray-600"><Edit className="w-3.5 h-3.5"/></button>
+                  </div>
+                );
+              })}
+              {subjects.length === 0 && <p className="text-sm text-gray-500 italic p-2">Nenhum assunto cadastrado.</p>}
+              <button onClick={() => { setEditingSubject({id: -1, nome: "", disciplina_id: 0, status: true}); setSubjectForm({nome: "", disciplina_id: 0, status: true}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-4 p-2 border border-dashed border-blue-300 rounded hover:bg-blue-50">
+                <PlusCircle className="w-4 h-4" /> Adicionar Assunto
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Turmas Tab */}
+      {activeTab === "turmas" && (
+        <section className="bg-white p-5 rounded-md border border-[#D0D7DE]">
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
+            <Calendar className="w-4 h-4 text-[#0969DA]" /> Turmas
+          </h3>
+          {editingClass ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded space-y-3">
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Curso</label>
+                  <select 
+                    value={classForm.curso_id || 0} 
+                    onChange={e => setClassForm({...classForm, curso_id: parseInt(e.target.value)})} 
+                    className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none"
+                  >
+                    <option value={0}>Selecione um curso</option>
+                    {courses.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Disciplina</label>
+                  <select 
+                    value={classForm.disciplina_id || 0} 
+                    onChange={e => setClassForm({...classForm, disciplina_id: parseInt(e.target.value)})} 
+                    className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none"
+                  >
+                    <option value={0}>Selecione uma disciplina</option>
+                    {disciplines
+                      .filter(d => d.curso_id === classForm.curso_id || !classForm.curso_id)
+                      .map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Ano</label>
+                  <input 
+                    type="number"
+                    value={classForm.ano || ""} 
+                    onChange={e => setClassForm({...classForm, ano: parseInt(e.target.value)})} 
+                    className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none" 
+                    placeholder="ex: 2024" 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Período</label>
+                  <select 
+                    value={classForm.periodo || "1º semestre"} 
+                    onChange={e => setClassForm({...classForm, periodo: e.target.value})} 
+                    className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none"
+                  >
+                    <option value="1º semestre">1º Semestre</option>
+                    <option value="2º semestre">2º Semestre</option>
+                    <option value="1º trimestre">1º Trimestre</option>
+                    <option value="2º trimestre">2º Trimestre</option>
+                    <option value="3º trimestre">3º Trimestre</option>
+                    <option value="4º trimestre">4º Trimestre</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Dia da Semana</label>
+                  <select 
+                    value={classForm.dia_da_semana || "Segunda-feira"} 
+                    onChange={e => setClassForm({...classForm, dia_da_semana: e.target.value})} 
+                    className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none"
+                  >
+                    <option value="Segunda-feira">Segunda-feira</option>
+                    <option value="Terça-feira">Terça-feira</option>
+                    <option value="Quarta-feira">Quarta-feira</option>
+                    <option value="Quinta-feira">Quinta-feira</option>
+                    <option value="Sexta-feira">Sexta-feira</option>
+                    <option value="Sábado">Sábado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Horário</label>
+                  <input 
+                    value={classForm.horario || ""} 
+                    onChange={e => setClassForm({...classForm, horario: e.target.value})} 
+                    className="w-full p-2 text-sm border rounded focus:ring-2 focus:ring-[#0969DA] outline-none" 
+                    placeholder="ex: 08:00 - 10:00" 
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input type="checkbox" checked={classForm.checkin_ativo ?? false} onChange={e => setClassForm({...classForm, checkin_ativo: e.target.checked})} className="rounded text-[#0969DA] focus:ring-[#0969DA]" />
+                Check-in Ativo
+              </label>
+
+              <div className="flex justify-between gap-2 pt-2 border-t border-blue-100">
+                {editingClass.id !== -1 ? (
+                  <button onClick={() => { onDeleteClass(editingClass.id); setEditingClass(null); }} className="p-1 text-red-600 hover:bg-red-50 rounded font-medium text-sm px-2">Deletar</button>
+                ) : <div/>}
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingClass(null)} className="p-1 text-gray-500 hover:bg-gray-200 rounded"><X className="w-4 h-4" /></button>
+                  <button onClick={saveClass} className="flex items-center gap-1 px-3 py-1 bg-[#0969DA] text-white rounded font-bold text-xs hover:bg-blue-700"><Save className="w-4 h-4" /> Salvar</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {classes.map(c => {
+                const curso = courses.find(cr => cr.id === c.curso_id);
+                const disciplina = disciplines.find(d => d.id === c.disciplina_id);
+                
+                return (
+                  <div key={c.id} className="flex justify-between items-start p-3 bg-[#F6F8FA] rounded border border-transparent hover:border-gray-200">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm text-gray-800">
+                        {disciplina?.nome || 'S/ Disciplina'} - {c.ano} ({c.periodo})
+                      </span>
+                      <span className="text-xs text-gray-600 mt-0.5">
+                        {curso?.nome || 'S/ Curso'}
+                      </span>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                        <span>{c.dia_da_semana}</span>
+                        <span>&bull;</span>
+                        <span>{c.horario}</span>
+                        <span>&bull;</span>
+                        <span className={c.checkin_ativo ? 'text-green-600 font-bold' : 'text-gray-400'}>
+                          {c.checkin_ativo ? 'Check-in Aberto' : 'Check-in Fechado'}
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => startEditClass(c)} className="p-1.5 hover:bg-white border shadow-sm rounded text-gray-600 mt-1"><Edit className="w-3.5 h-3.5"/></button>
+                  </div>
+                );
+              })}
+              {classes.length === 0 && <p className="text-sm text-gray-500 italic p-2">Nenhuma turma cadastrada.</p>}
+              <button onClick={() => { setEditingClass({id: -1, curso_id: 0, disciplina_id: 0, ano: new Date().getFullYear(), periodo: "1º semestre", dia_da_semana: "Segunda-feira", horario: "", checkin_ativo: false}); setClassForm({curso_id: 0, disciplina_id: 0, ano: new Date().getFullYear(), periodo: "1º semestre", dia_da_semana: "Segunda-feira", horario: "", checkin_ativo: false}); }} className="w-full text-xs text-[#0969DA] font-bold flex items-center justify-center gap-1 mt-4 p-2 border border-dashed border-blue-300 rounded hover:bg-blue-50">
+                <PlusCircle className="w-4 h-4" /> Adicionar Turma
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
     </div>
   );
-}
+};

@@ -21,32 +21,7 @@ export const INITIAL_STUDENT: Student = {
 
 export const INITIAL_SUBJECTS: Subject[] = [];
 
-export const INITIAL_CLASSES: Class[] = [
-  {
-    id: 101,
-    data_aula: "SET 24",
-    titulo: "Cálculo Diferencial e Integral I",
-    horario: "08:30 - 10:10",
-    local: "Lab 402",
-    checkin_ativo: true
-  },
-  {
-    id: 102,
-    data_aula: "SET 24",
-    titulo: "Física Geral Experimental",
-    horario: "10:30 - 12:10",
-    local: "Auditório A",
-    checkin_ativo: false
-  },
-  {
-    id: 103,
-    data_aula: "SET 24",
-    titulo: "Probabilidade e Estatística",
-    horario: "14:00 - 15:40",
-    local: "Sala 105",
-    checkin_ativo: false
-  }
-];
+export const INITIAL_CLASSES: Class[] = [];
 
 export const INITIAL_ENROLLMENT_REQUESTS: EnrollmentRequest[] = [
   {

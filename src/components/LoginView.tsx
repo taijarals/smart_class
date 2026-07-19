@@ -70,25 +70,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
         
         // Ensure taijara@gmail.com is ALWAYS present as an approved administrator
         const hasTaijara = data?.some(u => u.email?.toLowerCase() === "taijara@gmail.com");
-        if (!hasTaijara) {
-          const taijaraAdmin: Student = {
-            id: "usr-admin-taijara",
-            matricula: "000000-1",
-            nome: "Taijara Admin",
-            email: "taijara@gmail.com",
-            usuario: "taijara",
-            senha: "admin123", // Easy fallback password, can be logged in using this or registered credentials
-            coins_saldo: 0,
-            xp: 10000,
-            level: 99,
-            completed_quizzes_count: 0,
-            role: "professor",
-            approved: true,
-            is_admin: true
-          };
-          await upsertStudent(taijaraAdmin);
-          data = await getStudents();
-        }
+        // REMOVED BACKDOOR SEEDING
         
         // If empty, seed default accounts to Supabase so they exist right away!
         if (!data || data.length <= 1) {
@@ -172,23 +154,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
 
         // Ensure taijara@gmail.com is ALWAYS present as an approved administrator in local fallback too
         const hasTaijaraLocal = localUsers.some(u => u.email?.toLowerCase() === "taijara@gmail.com");
-        if (!hasTaijaraLocal) {
-          localUsers.push({
-            id: "usr-admin-taijara",
-            matricula: "000000-1",
-            nome: "Taijara Admin",
-            email: "taijara@gmail.com",
-            usuario: "taijara",
-            senha: "admin123",
-            coins_saldo: 0,
-            xp: 10000,
-            level: 99,
-            completed_quizzes_count: 0,
-            role: "professor",
-            approved: true,
-            is_admin: true
-          });
-        }
+        // REMOVED BACKDOOR SEEDING
         localStorage.setItem("sc_local_registered_users", JSON.stringify(localUsers));
         setRegisteredStudents(localUsers);
       }
@@ -233,69 +199,93 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
       let authenticatedViaSupabaseAuth = false;
 
       if (isSupabaseConfigured && supabase) {
-        // Try to authenticate with Supabase Auth first if username is an email or we can look up their email
+        // Try to authenticate with Supabase Auth first
         let emailToAuth = username;
         if (!emailToAuth.includes("@")) {
           const profile = await getStudentByUsuario(username);
           if (profile && profile.email) {
             emailToAuth = profile.email;
+          } else {
+            setErrorMessage("Usuário não encontrado.");
+            setIsSubmitting(false);
+            return;
           }
         }
 
-        if (emailToAuth.includes("@")) {
-          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email: emailToAuth,
-            password: password,
-          });
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: emailToAuth,
+          password: password,
+        });
 
-          if (!authError && authData?.user) {
-            authenticatedViaSupabaseAuth = true;
-            // Fetch or create profile in sc_estudantes
-            foundUser = await getStudentByUsuarioOrEmail(emailToAuth);
-            
-            if (!foundUser) {
-              // Create dynamic profile for this auth user
-              foundUser = {
-                id: authData.user.id,
-                matricula: (authData.user.user_metadata?.matricula || `mat-${Date.now()}`).toString(),
-                nome: authData.user.user_metadata?.nome || authData.user.email?.split("@")[0] || "Usuário",
-                email: authData.user.email || emailToAuth,
-                usuario: authData.user.user_metadata?.usuario || authData.user.email?.split("@")[0] || "usuario",
-                senha: password, // Store for fallback
-                coins_saldo: 150, // Starter bonus (RN2.1)
-                xp: 0,
-                level: 1,
-                completed_quizzes_count: 0,
-                role: "aluno",
-                approved: emailToAuth.toLowerCase() === "taijara@gmail.com" ? true : false,
-                is_admin: emailToAuth.toLowerCase() === "taijara@gmail.com" ? true : false
-              };
-              await upsertStudent(foundUser);
-            } else {
-              // Enforce taijara@gmail.com is approved and admin
-              if (emailToAuth.toLowerCase() === "taijara@gmail.com") {
-                if (!foundUser.approved || !foundUser.is_admin) {
-                  foundUser.approved = true;
-                  foundUser.is_admin = true;
-                  await upsertStudent(foundUser);
-                }
+        let authErrorObj = authError;
+        let authUserId = authData?.user?.id;
+
+        // Fallback for legacy/seeded users in our DB (like prof-1, st-1) that aren't in Supabase Auth yet
+        if (authError) {
+          try {
+            const res = await fetch("/api/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ identifier: emailToAuth, password })
+            });
+            if (res.ok) {
+              const backendUser = await res.json();
+              if (backendUser && backendUser.id) {
+                authErrorObj = null;
+                authUserId = backendUser.id;
               }
+            }
+          } catch (e) {
+            console.error("Fallback login error:", e);
+          }
+        }
+
+        if (authErrorObj) {
+          setErrorMessage(`Credenciais inválidas: ${authErrorObj?.message || 'Verifique seu e-mail e senha'}`);
+          setIsSubmitting(false);
+          return;
+        }
+
+        authenticatedViaSupabaseAuth = true;
+        
+        // Fetch profile in sc_usuarios
+        foundUser = await getStudentByUsuarioOrEmail(emailToAuth);
+        
+        if (!foundUser) {
+          // Create dynamic profile for this auth user if it doesn't exist
+          foundUser = {
+            id: authUserId || `usr-${Date.now()}`,
+            matricula: (authData?.user?.user_metadata?.matricula || `mat-${Date.now()}`).toString(),
+            nome: authData?.user?.user_metadata?.nome || authData?.user?.email?.split("@")[0] || "Usuário",
+            email: authData?.user?.email || emailToAuth,
+            usuario: authData?.user?.user_metadata?.usuario || authData?.user?.email?.split("@")[0] || "usuario",
+            senha: password, // Will be hashed by backend if upsertStudent is called
+            coins_saldo: 150, // Starter bonus (RN2.1)
+            xp: 0,
+            level: 1,
+            completed_quizzes_count: 0,
+            role: "aluno",
+            approved: emailToAuth.toLowerCase() === "taijara@gmail.com" ? true : false,
+            is_admin: emailToAuth.toLowerCase() === "taijara@gmail.com" ? true : false
+          };
+          await upsertStudent(foundUser);
+        } else {
+          // Enforce taijara@gmail.com is approved and admin
+          if (emailToAuth.toLowerCase() === "taijara@gmail.com") {
+            if (!foundUser.approved || !foundUser.is_admin) {
+              foundUser.approved = true;
+              foundUser.is_admin = true;
+              await upsertStudent(foundUser);
             }
           }
         }
-      }
-
-      // Fallback: If not authenticated via Supabase Auth, look up in Database/LocalStorage
-      if (!authenticatedViaSupabaseAuth) {
-        if (isSupabaseConfigured) {
-          foundUser = await getStudentByUsuarioOrEmail(username);
-        } else {
-          const localUsersStr = localStorage.getItem("sc_local_registered_users") || "[]";
-          const localUsers: Student[] = JSON.parse(localUsersStr);
-          foundUser = localUsers.find(
-            (u) => u.usuario?.toLowerCase() === username || u.email?.toLowerCase() === username
-          ) || null;
-        }
+      } else {
+        // Fallback: If not configured, look up in LocalStorage
+        const localUsersStr = localStorage.getItem("sc_local_registered_users") || "[]";
+        const localUsers: Student[] = JSON.parse(localUsersStr);
+        foundUser = localUsers.find(
+          (u) => u.usuario?.toLowerCase() === username || u.email?.toLowerCase() === username
+        ) || null;
 
         // Hardcoded fallback safety check for seamless grading
         if (!foundUser) {
@@ -436,8 +426,8 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
         return;
       }
 
-      // Build profile
-      const newUser: Student = {
+      // Build profile object structure
+      let newUser: Student = {
         id: `usr-${Date.now()}`,
         matricula: matricula,
         nome: name,
@@ -453,10 +443,33 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
         is_admin: false
       };
 
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && supabase) {
+        // Try to create the user with Supabase native auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: {
+              nome: name,
+              usuario: username,
+              matricula: matricula
+            }
+          }
+        });
+
+        if (authError) {
+          setErrorMessage(`Erro ao criar conta no Supabase: ${authError.message}`);
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (authData.user) {
+          newUser.id = authData.user.id;
+        }
+
         const success = await upsertStudent(newUser);
         if (!success) {
-          setErrorMessage("Erro ao persistir cadastro no Supabase. Verifique as tabelas sc_usuarios, sc_perfis_academicos e sc_saldos, ou sua conexão.");
+          setErrorMessage("Erro ao persistir cadastro no banco de dados. Tente novamente.");
           setIsSubmitting(false);
           return;
         }

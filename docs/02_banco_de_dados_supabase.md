@@ -34,25 +34,43 @@ Para garantir as melhores práticas de banco de dados, o aplicativo foi desenhad
 
 ---
 
-## 🚀 Script SQL Completo para Reconstruir o Banco do Zero (Schema Público)
+## 🚀 Script SQL Completo para Reconstruir o Banco do Zero (Schema Customizado)
 
-Como seu banco está vazio e você deseja resetar tudo, abra o **SQL Editor** no painel do seu Supabase, cole o bloco de código abaixo e clique em **Run**:
+Como você está dividindo o projeto com outras aplicações, criaremos um schema exclusivo chamado `smartclass`. Para que isso funcione, siga estas duas etapas fundamentais:
+
+### PASSO 1: Expor o Schema na API (IMPORTANTE)
+1. No painel do seu Supabase, vá em **Project Settings** (o ícone de engrenagem no menu esquerdo).
+2. Clique em **API** no menu lateral de configurações.
+3. Na seção **API Settings**, procure pelo campo **Exposed schemas**.
+4. Clique no campo, digite `smartclass` e selecione/adicione na lista.
+5. Salve as alterações. Se o Supabase não salvar automaticamente, certifique-se de clicar no botão verde de "Save" que aparecerá.
+
+### PASSO 2: Rodar o Script de Banco de Dados
+Abra o **SQL Editor** no painel do seu Supabase, cole o bloco de código abaixo e clique em **Run**:
 
 ```sql
--- 1. Remover tabelas antigas para garantir recriação limpa e sem conflitos
-DROP TABLE IF EXISTS public.sc_checkins_quiz CASCADE;
-DROP TABLE IF EXISTS public.sc_resgates CASCADE;
-DROP TABLE IF EXISTS public.sc_solicitacoes CASCADE;
-DROP TABLE IF EXISTS public.sc_questoes CASCADE;
-DROP TABLE IF EXISTS public.sc_aulas CASCADE;
-DROP TABLE IF EXISTS public.sc_assuntos CASCADE;
-DROP TABLE IF EXISTS public.sc_saldos CASCADE;
-DROP TABLE IF EXISTS public.sc_perfis_academicos CASCADE;
-DROP TABLE IF EXISTS public.sc_usuarios CASCADE;
-DROP TABLE IF EXISTS public.sc_estudantes CASCADE;
+-- 1. Criação do Schema e Permissões
+CREATE SCHEMA IF NOT EXISTS smartclass;
+GRANT USAGE ON SCHEMA smartclass TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA smartclass TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA smartclass TO anon, authenticated;
 
--- 2. Tabela Central de Usuários (Estudantes, Professores e Administradores)
-CREATE TABLE public.sc_usuarios (
+-- 2. Remover tabelas antigas (caso existam) para garantir recriação limpa e sem conflitos
+DROP TABLE IF EXISTS smartclass.sc_checkins_quiz CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_resgates CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_solicitacoes CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_questoes CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_aulas CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_turmas CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_assuntos CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_disciplinas CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_cursos CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_saldos CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_perfis_academicos CASCADE;
+DROP TABLE IF EXISTS smartclass.sc_usuarios CASCADE;
+
+-- 3. Tabela Central de Usuários (Estudantes, Professores e Administradores)
+CREATE TABLE smartclass.sc_usuarios (
   id TEXT PRIMARY KEY, -- Recebe o ID do Supabase Auth ou IDs locais
   nome TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
@@ -64,42 +82,58 @@ CREATE TABLE public.sc_usuarios (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. Tabela de Perfis Acadêmicos (1:1 com sc_usuarios)
-CREATE TABLE public.sc_perfis_academicos (
-  usuario_id TEXT PRIMARY KEY REFERENCES public.sc_usuarios(id) ON DELETE CASCADE,
+-- 4. Tabela de Perfis Acadêmicos (1:1 com sc_usuarios)
+CREATE TABLE smartclass.sc_perfis_academicos (
+  usuario_id TEXT PRIMARY KEY REFERENCES smartclass.sc_usuarios(id) ON DELETE CASCADE,
   matricula TEXT UNIQUE NOT NULL,
   xp INTEGER DEFAULT 0 NOT NULL,
   level INTEGER DEFAULT 1 NOT NULL,
   completed_quizzes_count INTEGER DEFAULT 0 NOT NULL
 );
 
--- 4. Tabela de Saldos e Moedas (1:1 com sc_usuarios)
-CREATE TABLE public.sc_saldos (
-  usuario_id TEXT PRIMARY KEY REFERENCES public.sc_usuarios(id) ON DELETE CASCADE,
+-- 5. Tabela de Saldos e Moedas (1:1 com sc_usuarios)
+CREATE TABLE smartclass.sc_saldos (
+  usuario_id TEXT PRIMARY KEY REFERENCES smartclass.sc_usuarios(id) ON DELETE CASCADE,
   coins_saldo INTEGER DEFAULT 150 NOT NULL -- Bônus de 150 ClassCoins ao iniciar (RN2.1)
 );
 
--- 5. Tabela de Assuntos das Aulas
-CREATE TABLE public.sc_assuntos (
+-- 5.a Tabela de Cursos
+CREATE TABLE smartclass.sc_cursos (
   id BIGINT PRIMARY KEY,
+  nome TEXT NOT NULL
+);
+
+-- 5.b Tabela de Disciplinas
+CREATE TABLE smartclass.sc_disciplinas (
+  id BIGINT PRIMARY KEY,
+  curso_id BIGINT REFERENCES smartclass.sc_cursos(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL
+);
+
+-- 6. Tabela de Assuntos das Aulas
+CREATE TABLE smartclass.sc_assuntos (
+  id BIGINT PRIMARY KEY,
+  disciplina_id BIGINT REFERENCES smartclass.sc_disciplinas(id) ON DELETE CASCADE,
   nome TEXT NOT NULL,
   status BOOLEAN DEFAULT true NOT NULL -- Ativo ou Inativo para sorteio
 );
 
--- 6. Tabela de Aulas Ministradas
-CREATE TABLE public.sc_aulas (
+-- 7. Tabela de Turmas
+CREATE TABLE smartclass.sc_turmas (
   id BIGINT PRIMARY KEY,
-  data_aula TEXT NOT NULL,
-  titulo TEXT NOT NULL,
+  curso_id BIGINT REFERENCES smartclass.sc_cursos(id) ON DELETE CASCADE,
+  disciplina_id BIGINT REFERENCES smartclass.sc_disciplinas(id) ON DELETE CASCADE,
+  ano INTEGER NOT NULL,
+  periodo TEXT NOT NULL,
+  dia_da_semana TEXT NOT NULL,
   horario TEXT NOT NULL,
-  local TEXT NOT NULL,
   checkin_ativo BOOLEAN DEFAULT false NOT NULL -- Ativado pelo professor no início da aula
 );
 
--- 7. Tabela de Questões Gamificadas (Quizzes)
-CREATE TABLE public.sc_questoes (
+-- 8. Tabela de Questões Gamificadas (Quizzes)
+CREATE TABLE smartclass.sc_questoes (
   id TEXT PRIMARY KEY,
-  assunto_id BIGINT REFERENCES public.sc_assuntos(id) ON DELETE CASCADE,
+  assunto_id BIGINT REFERENCES smartclass.sc_assuntos(id) ON DELETE CASCADE,
   enunciado TEXT NOT NULL,
   opcoes JSONB NOT NULL, -- Formato: {"A": "Opção A", "B": "Opção B", ...}
   resposta_correta TEXT NOT NULL, -- 'A' | 'B' | 'C' | 'D' | 'E'
@@ -107,8 +141,8 @@ CREATE TABLE public.sc_questoes (
   status BOOLEAN DEFAULT true NOT NULL
 );
 
--- 8. Tabela de Solicitações de Matrículas em Turmas
-CREATE TABLE public.sc_solicitacoes (
+-- 9. Tabela de Solicitações de Matrículas em Turmas
+CREATE TABLE smartclass.sc_solicitacoes (
   id TEXT PRIMARY KEY,
   aluno_nome TEXT NOT NULL,
   aluno_matricula TEXT NOT NULL,
@@ -116,20 +150,20 @@ CREATE TABLE public.sc_solicitacoes (
   status TEXT DEFAULT 'PENDENTE' NOT NULL -- 'PENDENTE' | 'APROVADO' | 'RECUSADO'
 );
 
--- 9. Tabela de Resgates de Benefícios na Loja
-CREATE TABLE public.sc_resgates (
+-- 10. Tabela de Resgates de Benefícios na Loja
+CREATE TABLE smartclass.sc_resgates (
   id TEXT PRIMARY KEY,
-  aluno_id TEXT REFERENCES public.sc_usuarios(id) ON DELETE CASCADE,
+  aluno_id TEXT REFERENCES smartclass.sc_usuarios(id) ON DELETE CASCADE,
   coins_gastos INTEGER NOT NULL,
   beneficio TEXT NOT NULL,
   data_resgate TEXT NOT NULL
 );
 
--- 10. Tabela de Check-ins e Tentativas de Quizzes Realizados
-CREATE TABLE public.sc_checkins_quiz (
+-- 11. Tabela de Check-ins e Tentativas de Quizzes Realizados
+CREATE TABLE smartclass.sc_checkins_quiz (
   id TEXT PRIMARY KEY,
-  aluno_id TEXT REFERENCES public.sc_usuarios(id) ON DELETE CASCADE,
-  aula_id BIGINT REFERENCES public.sc_aulas(id) ON DELETE CASCADE,
+  aluno_id TEXT REFERENCES smartclass.sc_usuarios(id) ON DELETE CASCADE,
+  aula_id BIGINT REFERENCES smartclass.sc_turmas(id) ON DELETE CASCADE,
   iniciado_em TEXT NOT NULL,
   finalizado_em TEXT,
   questoes_sorteadas TEXT[] NOT NULL,
@@ -139,27 +173,35 @@ CREATE TABLE public.sc_checkins_quiz (
   status TEXT DEFAULT 'concluido' NOT NULL -- 'em_progresso' | 'concluido' | 'expirado'
 );
 
--- 11. Inserir Massa Inicial de Testes (Professor e Aluno de Exemplo)
+-- 12. Garantir permissões nas tabelas recém criadas
+GRANT ALL ON ALL TABLES IN SCHEMA smartclass TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA smartclass TO anon, authenticated;
+
+-- 13. Inserir Massa Inicial de Testes (Professor e Aluno de Exemplo)
 -- Inserir nos Usuários
-INSERT INTO public.sc_usuarios (id, nome, email, usuario, senha, role, approved, is_admin)
+-- Senhas pré-hasheadas ('admin123' e 'aluno123') usando bcrypt com cost 10
+INSERT INTO smartclass.sc_usuarios (id, nome, email, usuario, senha, role, approved, is_admin)
 VALUES 
-('prof-1', 'Dr. Ricardo Veras', 'ricardo.veras@universidade.edu.br', 'ricardo', 'admin123', 'professor', true, true),
-('st-1', 'Ana Luíza Costa', 'ana.costa@universidade.edu.br', 'ana', 'aluno123', 'aluno', true, false)
+('prof-1', 'Dr. Ricardo Veras', 'ricardo.veras@universidade.edu.br', 'ricardo', '$2b$10$Ml2VIcXwfND08x2RxE9YOe3.LX2nP5Msy6Y9BFa3rt3VAg54gXnGW', 'professor', true, true),
+('st-1', 'Ana Luíza Costa', 'ana.costa@universidade.edu.br', 'ana', '$2b$10$a.yx1EvtJIKWXHCDZBdly.2WY8.XWJtvyt.1gfqEMasdjqkQiE0XK', 'aluno', true, false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Inserir nos Perfis Acadêmicos
-INSERT INTO public.sc_perfis_academicos (usuario_id, matricula, xp, level, completed_quizzes_count)
+INSERT INTO smartclass.sc_perfis_academicos (usuario_id, matricula, xp, level, completed_quizzes_count)
 VALUES 
 ('prof-1', '99999', 10000, 99, 0),
 ('st-1', '20240551-0', 2400, 8, 12)
 ON CONFLICT (usuario_id) DO NOTHING;
 
 -- Inserir nos Saldos
-INSERT INTO public.sc_saldos (usuario_id, coins_saldo)
+INSERT INTO smartclass.sc_saldos (usuario_id, coins_saldo)
 VALUES 
 ('prof-1', 0),
 ('st-1', 540)
 ON CONFLICT (usuario_id) DO NOTHING;
+
+-- ATENÇÃO: Recarregar o cache do schema do PostgREST para evitar o erro "Could not find the column in the schema cache"
+NOTIFY pgrst, reload_schema;
 ```
 
 ---

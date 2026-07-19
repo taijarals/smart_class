@@ -52,7 +52,7 @@ export default function StudentHome({ student, classes, onStartQuiz, onGoToProfi
 
           <div>
             <h3 className="font-sans font-bold text-lg text-[#24292F] leading-tight">
-              {activeClass?.titulo || "Sem Aulas Hoje"}
+              {activeClass?.dia_da_semana ? `Turma de ${activeClass.dia_da_semana}` : "Sem Aulas Hoje"}
             </h3>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-[#57606A]">
               <span className="flex items-center gap-1">
@@ -61,7 +61,7 @@ export default function StudentHome({ student, classes, onStartQuiz, onGoToProfi
               </span>
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-[#57606A]" />
-                Sala {activeClass?.local || "N/A"}
+                {activeClass?.periodo} {activeClass?.ano}
               </span>
             </div>
           </div>
