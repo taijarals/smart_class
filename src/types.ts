@@ -35,6 +35,7 @@ export interface Subject {
   disciplina_id: number; // Linked to discipline
   nome: string;
   status: boolean; // TRUE = Ativo para sorteio
+  criado_por?: string; // ID do professor que criou o assunto
 }
 
 export interface Question {
@@ -56,6 +57,7 @@ export interface Class { // This represents Turma
   dia_da_semana: string;
   horario: string; // Ex: "08:30 - 10:10"
   checkin_ativo: boolean; // Ativado pelo professor no início da aula
+  criado_por?: string; // ID do professor que criou a turma
 }
 
 export interface EnrollmentRequest {

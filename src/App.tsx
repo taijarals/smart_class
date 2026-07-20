@@ -67,6 +67,7 @@ import ManageQuestions from "./components/ManageQuestions";
 import { ManageCourses } from "./components/ManageCourses";
 import StudentProfile from "./components/StudentProfile";
 import LoginView from "./components/LoginView";
+import WaitingRoom from "./components/WaitingRoom";
 
 export default function App() {
   // Global States (with localStorage backing)
@@ -337,6 +338,25 @@ export default function App() {
     }
   };
 
+  const handleUpdateUserInList = async (updatedUser: Student) => {
+    const updatedList = usersList.map((u) => u.id === updatedUser.id ? updatedUser : u);
+    setUsersList(updatedList);
+
+    if (isSupabaseConfigured) {
+      try {
+        await upsertStudent(updatedUser);
+      } catch (err) {
+        console.error("Failed to update user in Supabase:", err);
+      }
+    } else {
+      localStorage.setItem("sc_local_registered_users", JSON.stringify(updatedList));
+    }
+
+    if (updatedUser.id === student.id) {
+      setStudent(updatedUser);
+    }
+  };
+
   // Auth handlers
   const handleLoginSuccess = (userRole: "aluno" | "professor", customStudent?: Student) => {
     setRole(userRole);
@@ -353,6 +373,27 @@ export default function App() {
     setIsAuthenticated(false);
     localStorage.removeItem("sc_authenticated");
     setIsQuizActive(false);
+  };
+
+  const handleSubmitEnrollmentRequest = (turmaDescricao: string) => {
+    const newRequest: EnrollmentRequest = {
+      id: `req-${Date.now()}`,
+      aluno_nome: student.nome,
+      aluno_matricula: student.matricula,
+      turmas_solicitadas: [turmaDescricao],
+      status: "PENDENTE"
+    };
+
+    setRequests((prev) => {
+      const filtered = prev.filter((r) => r.aluno_matricula !== student.matricula);
+      const updated = [newRequest, ...filtered];
+      localStorage.setItem("sc_requests", JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isSupabaseConfigured) {
+      upsertRequest(newRequest);
+    }
   };
 
   // Handler functions
@@ -464,7 +505,7 @@ export default function App() {
   };
 
   // 6. Professor approves or declines student solicitudes (Enrollment tab)
-  const handleProcessRequest = (id: string, action: "APROVADO" | "RECUSADO") => {
+  const handleProcessRequest = async (id: string, action: "APROVADO" | "RECUSADO") => {
     setRequests((prev) => {
       const updated = prev.map((r) => {
         if (r.id === id) {
@@ -478,6 +519,16 @@ export default function App() {
       }
       return updated;
     });
+
+    if (action === "APROVADO") {
+      const req = requests.find((r) => r.id === id);
+      if (req) {
+        const aluno = usersList.find((u) => u.matricula === req.aluno_matricula);
+        if (aluno) {
+          await handleApproveUser(aluno.id, false);
+        }
+      }
+    }
   };
 
   // 7. Add question to active pool (RN1)
@@ -633,6 +684,44 @@ export default function App() {
     }
   };
 
+  // Garante que alunos fiquem restritos ao papel de aluno, sem poder chavear para professor (RN de Fluxo de Papéis)
+  useEffect(() => {
+    if (student && student.role === "aluno" && role !== "aluno") {
+      setRole("aluno");
+    }
+  }, [student, role]);
+
+  // Filtragem dos dados de acordo com o papel e autoria (RN de Gestão Restrita para Professores)
+  const dashboardClasses = student.is_admin 
+    ? classes 
+    : classes.filter((c) => !c.criado_por || c.criado_por === student.id);
+
+  const dashboardSubjects = student.is_admin 
+    ? subjects 
+    : subjects.filter((s) => !s.criado_por || s.criado_por === student.id);
+
+  // No ManageQuestions, filtramos os assuntos criados por ele e as questões que pertencem a estes assuntos
+  const questionsSubjects = student.is_admin 
+    ? subjects 
+    : subjects.filter((s) => !s.criado_por || s.criado_por === student.id);
+  const questionsSubjectsIds = questionsSubjects.map((s) => s.id);
+  const questionsList = student.is_admin 
+    ? questions 
+    : questions.filter((q) => questionsSubjectsIds.includes(q.assunto_id));
+
+  // Filtragem de solicitações de matrícula para professores (apenas as turmas criadas por ele) ou tudo se admin
+  const allowedRequests = student.is_admin
+    ? requests
+    : requests.filter((r) => {
+        const firstTurma = r.turmas_solicitadas?.[0];
+        if (!firstTurma) return false;
+        const match = firstTurma.match(/Turma #(\d+)/);
+        if (!match) return false;
+        const classId = Number(match[1]);
+        const cls = classes.find((c) => c.id === classId);
+        return cls && cls.criado_por === student.id;
+      });
+
   // Restrict questions pool dynamically to active subjects and questions (RN3)
   const activeSubjectsIds = subjects.filter((s) => s.status).map((s) => s.id);
   const eligibleQuestions = questions.filter(
@@ -644,6 +733,20 @@ export default function App() {
       <LoginView
         onLoginSuccess={handleLoginSuccess}
         currentStudent={student}
+      />
+    );
+  }
+
+  if (role === "aluno" && !student.approved) {
+    return (
+      <WaitingRoom
+        courses={courses}
+        disciplines={disciplines}
+        classes={classes}
+        student={student}
+        requests={requests}
+        onSubmitRequest={handleSubmitEnrollmentRequest}
+        onLogout={handleLogout}
       />
     );
   }
@@ -678,22 +781,24 @@ export default function App() {
 
       {/* Main Container Viewport */}
       <main className="pt-24 px-4 md:px-8 max-w-7xl mx-auto">
-        {isAdminViewActive && student.is_admin ? (
+        {isAdminViewActive ? (
           <AccessManagement
-            requests={requests}
+            requests={allowedRequests}
             onProcessRequest={handleProcessRequest}
             onGoBack={() => setIsAdminViewActive(false)}
             usersList={usersList}
             onApproveUser={handleApproveUser}
             onRejectUser={handleRejectUser}
+            onUpdateUser={handleUpdateUserInList}
+            student={student}
           />
         ) : role === "professor" ? (
           /* Professor View Interface Routing */
           <div>
             {professorScreen === "dashboard" && (
               <ProfessorDashboard
-                classes={classes}
-                subjects={subjects}
+                classes={dashboardClasses}
+                subjects={dashboardSubjects}
                 onToggleCheckin={handleToggleCheckin}
                 onToggleSubject={handleToggleSubject}
                 onChangeScreen={(scr) => {
@@ -703,15 +808,15 @@ export default function App() {
                     setProfessorScreen(scr as any);
                   }
                 }}
-                studentRequestsCount={requests.filter((r) => r.status === "PENDENTE").length}
+                studentRequestsCount={allowedRequests.filter((r) => r.status === "PENDENTE").length}
                 student={student}
               />
             )}
 
             {professorScreen === "manage_questions" && (
               <ManageQuestions
-                questions={questions}
-                subjects={subjects}
+                questions={questionsList}
+                subjects={questionsSubjects}
                 onAddQuestion={handleAddQuestion}
                 onToggleQuestionStatus={handleToggleQuestionStatus}
                 onDeleteQuestion={handleDeleteQuestion}
@@ -738,6 +843,7 @@ export default function App() {
                 onUpdateClass={handleUpsertClass}
                 onDeleteClass={handleDeleteClass}
                 onGoBack={() => setProfessorScreen("dashboard")}
+                student={student}
               />
             )}
           </div>

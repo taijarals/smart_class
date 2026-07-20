@@ -51,21 +51,19 @@ export default function ProfessorDashboard({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {/* Gestão de Acessos link with pending indicator badge (Admins only) */}
-          {student.is_admin && (
-            <button
-              onClick={() => onChangeScreen("access_management")}
-              className="relative bg-[#F6F8FA] border border-[#D0D7DE] text-[#24292F] hover:bg-[#F3F4F6] font-sans font-bold text-xs px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all"
-            >
-              <ClipboardList className="w-4 h-4 text-[#0969DA]" />
-              Gestão de Acessos
-              {studentRequestsCount > 0 && (
-                <span className="ml-1 bg-[#CF222E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                  {studentRequestsCount}
-                </span>
-              )}
-            </button>
-          )}
+          {/* Gestão de Acessos / Matrículas link with pending indicator badge */}
+          <button
+            onClick={() => onChangeScreen("access_management")}
+            className="relative bg-[#F6F8FA] border border-[#D0D7DE] text-[#24292F] hover:bg-[#F3F4F6] font-sans font-bold text-xs px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          >
+            <ClipboardList className="w-4 h-4 text-[#0969DA]" />
+            {student.is_admin ? "Gestão de Acessos" : "Matrículas de Alunos"}
+            {studentRequestsCount > 0 && (
+              <span className="ml-1 bg-[#CF222E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                {studentRequestsCount}
+              </span>
+            )}
+          </button>
 
           <button
             onClick={() => onChangeScreen("manage_courses")}

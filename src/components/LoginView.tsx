@@ -370,12 +370,12 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
         return;
       }
 
-      // Verify Access Approval (RN5.1)
-      if (!foundUser.approved) {
+      // Verify Access Approval (RN5.1) - Apenas professores precisam de aprovação direta do Admin para logar
+      if (!foundUser.approved && foundUser.role === "professor") {
         if (isSupabaseConfigured && supabase) {
           await supabase.auth.signOut();
         }
-        setErrorMessage(`Acesso Pendente: O cadastro de "${foundUser.nome}" ainda não foi aprovado por um Administrador no ambiente de Gestão de Acessos.`);
+        setErrorMessage(`Acesso Pendente: O cadastro do docente "${foundUser.nome}" ainda não foi aprovado por um Administrador no ambiente de Gestão de Acessos.`);
         setIsSubmitting(false);
         return;
       }

@@ -78,31 +78,33 @@ export default function Header({
 
       {/* Action center with Selector and Coin Display */}
       <div className="flex items-center gap-2">
-        {/* Role toggle switcher */}
-        <div className="flex bg-[#F6F8FA] rounded-md p-0.5 border border-[#D0D7DE]">
-          <button
-            onClick={() => setRole("aluno")}
-            className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
-              !isProfessor
-                ? "bg-white text-[#0969DA] border border-[#D0D7DE]/40 shadow-sm"
-                : "text-[#57606A] hover:text-[#24292F]"
-            }`}
-          >
-            <GraduationCap className="w-3 h-3" />
-            Aluno
-          </button>
-          <button
-            onClick={() => setRole("professor")}
-            className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
-              isProfessor
-                ? "bg-white text-[#2DA44E] border border-[#D0D7DE]/40 shadow-sm"
-                : "text-[#57606A] hover:text-[#24292F]"
-            }`}
-          >
-            <Users className="w-3 h-3" />
-            Professor
-          </button>
-        </div>
+        {/* Role toggle switcher - Apenas disponível para usuários cadastrados como professor (RN de Fluxo de Papéis) */}
+        {student.role === "professor" && (
+          <div className="flex bg-[#F6F8FA] rounded-md p-0.5 border border-[#D0D7DE]">
+            <button
+              onClick={() => setRole("aluno")}
+              className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                !isProfessor
+                  ? "bg-white text-[#0969DA] border border-[#D0D7DE]/40 shadow-sm"
+                  : "text-[#57606A] hover:text-[#24292F]"
+              }`}
+            >
+              <GraduationCap className="w-3 h-3" />
+              Aluno
+            </button>
+            <button
+              onClick={() => setRole("professor")}
+              className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                isProfessor
+                  ? "bg-white text-[#2DA44E] border border-[#D0D7DE]/40 shadow-sm"
+                  : "text-[#57606A] hover:text-[#24292F]"
+              }`}
+            >
+              <Users className="w-3 h-3" />
+              Professor
+            </button>
+          </div>
+        )}
 
         {/* ClassCoin Chip */}
         <button
@@ -118,6 +120,20 @@ export default function Header({
             {student.coins_saldo.toFixed(0)} <span className="text-[9px] text-[#57606A] font-sans">CC</span>
           </span>
         </button>
+
+        {/* Botão de Gestão de Acessos para Administrador */}
+        {student.is_admin && onClickAccessManagement && (
+          <button
+            onClick={onClickAccessManagement}
+            title="Gestão de Acessos e Usuários"
+            className="flex items-center bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md border border-red-200 text-red-700 gap-1.5 transition-all text-left cursor-pointer"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+            <span className="font-sans text-[11px] font-bold tracking-tight">
+              Gestão
+            </span>
+          </button>
+        )}
 
         {/* User avatar */}
         <button
